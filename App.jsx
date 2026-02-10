@@ -13,8 +13,8 @@ const THEMES = [
 
 function App() {
   // --- State ---
-  const [view, setView] = useState('landing'); // 'landing', 'game'
-  const [gameState, setGameState] = useState('menu'); // 'menu', 'start', 'mode-selection', 'ready', 'playing', 'paused', 'gameover', 'leaderboard'
+  const [view, setView] = useState('welcome'); // 'welcome', 'game'
+  const [gameState, setGameState] = useState('home'); // 'home', 'playing', 'paused', 'gameover', 'leaderboard'
   const [playerName, setPlayerName] = useState('');
   const [finalScore, setFinalScore] = useState(0);
   const [leaderboard, setLeaderboard] = useState([]);
@@ -30,13 +30,13 @@ function App() {
 
   // Game entities stored in ref to avoid closure staleness in loop
   const gameData = useRef({
+    initialized: false,
     player: { x: 50, y: 0, width: 30, height: 30, velocityY: 0, isJumping: false },
     obstacles: [],
     score: 0,
     gameSpeed: 4,
     frameCounter: 0,
-    isGameOver: false,
-    bgX: 0
+    isGameOver: false
   });
 
   // Constants
@@ -109,44 +109,23 @@ function App() {
   };
 
   // --- Game Logic ---
-  const goToModes = () => {
+  const startGame = () => {
     if (!playerName.trim()) {
       alert("Please enter your name!");
       return;
     }
-    setGameState('mode-selection');
-  };
 
-  const startGame = () => {
-    // Reset Game Data
-    const canvas = canvasRef.current;
-    gameData.current = {
-      player: { 
-        x: 50, 
-        y: canvas.height - 30, 
-        width: 30, 
-        height: 30, 
-        velocityY: 0, 
-        isJumping: false 
-      },
-      obstacles: [],
-      score: 0,
-      gameSpeed: 4,
-      frameCounter: 0,
-      isGameOver: false,
-      bgX: 0
-    };
+    // Signal for re-initialization in the game loop effect
+    gameData.current.initialized = false;
 
     setGameState('playing');
   };
-
   const selectTheme = (theme) => {
     setSelectedTheme(theme);
-    setGameState('ready');
   };
 
   const restartGame = () => {
-    setGameState('start');
+    setGameState('home');
   };
 
   const pauseGame = () => {
@@ -158,7 +137,7 @@ function App() {
   };
 
   const exitGame = () => {
-    setGameState('menu');
+    setGameState('home');
     setPlayerName('');
   };
 
@@ -200,6 +179,26 @@ function App() {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
+    // Initialize game state here, where canvas is guaranteed to exist
+    if (!gameData.current.initialized) {
+        gameData.current = {
+            initialized: true,
+            player: {
+                x: 50,
+                y: canvas.height - 30,
+                width: 30,
+                height: 30,
+                velocityY: 0,
+                isJumping: false
+            },
+            obstacles: [],
+            score: 0,
+            gameSpeed: 4,
+            frameCounter: 0,
+            isGameOver: false,
+        };
+    }
+
     const handleInput = (e) => {
       // Ignore input if clicking a button (gameState check is implicit via useEffect dependency)
       if (e.target.tagName === 'BUTTON') return;
@@ -228,14 +227,10 @@ function App() {
 
       // Draw Background
       if (bgImageRef.current && bgImageRef.current.complete) {
-        state.bgX -= state.gameSpeed * 0.2; // Parallax speed (slower than game speed)
-        if (state.bgX <= -canvas.width) {
-          state.bgX = 0;
-        }
-        // Draw two images for seamless scrolling
-        ctx.drawImage(bgImageRef.current, state.bgX, 0, canvas.width, canvas.height);
-        ctx.drawImage(bgImageRef.current, state.bgX + canvas.width, 0, canvas.width, canvas.height);
+        // Draw a single static background image
+        ctx.drawImage(bgImageRef.current, 0, 0, canvas.width, canvas.height);
       } else {
+        // Fallback to clearing the canvas if the image isn't loaded
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
 
@@ -320,16 +315,16 @@ function App() {
     };
   }, [gameState]);
 
-  if (view === 'landing') {
+  if (view === 'welcome') {
     return (
       <div className="App">
-        <div className="overlay-screen" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <h1>Welcome to SKY Runner</h1>
+        <main style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
+          <h1>Welcome to SKY</h1>
           <p style={{ fontSize: '1.2rem', margin: '20px 0 40px' }}>Your adventure is about to begin.</p>
           <button onClick={() => setView('game')} style={styles.button}>
             Continue to Play
           </button>
-        </div>
+        </main>
       </div>
     );
   }
@@ -341,146 +336,103 @@ function App() {
       </header>
 
       <main>
-        <HighScore scoresUpdated={scoresUpdated} />
-        <h2>SKY</h2>
-        <div ref={gameContainerRef} className="game-container">
-          <div id="score-container" style={{ fontSize: '1.5rem', marginBottom: '10px' }}>
-            Score: <span ref={scoreSpanRef}>0</span>
+        {gameState === 'home' && (
+          <div id="homeScreen">
+            <HighScore scoresUpdated={scoresUpdated} />
+            <h2 style={{ marginTop: '15px' }}>Enter Your Name</h2>
+            <input
+              type="text"
+              placeholder="Your Name"
+              maxLength="15"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              style={styles.input}
+            />
+            <h2>Choose Your Theme</h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>
+              {THEMES.map((theme) => (
+                <button
+                  key={theme.id}
+                  onClick={() => selectTheme(theme)}
+                  style={{
+                    ...styles.modeButton,
+                    borderColor: selectedTheme.id === theme.id ? '#646cff' : '#ccc',
+                    backgroundColor: selectedTheme.id === theme.id ? '#e0e1ff' : '#fff',
+                  }}
+                >
+                  {theme.name}
+                </button>
+              ))}
+            </div>
+            <button onClick={startGame} style={styles.button}>Start Game</button>
+            <button onClick={viewLeaderboard} style={{...styles.button, backgroundColor: '#6c757d'}}>View Leaderboard</button>
           </div>
-          
-          <canvas ref={canvasRef} />
+        )}
 
-          {/* --- Responsive Styles --- */}
-          <style>{`
-            .App {
-              width: 90%;
-              padding: 1rem;
-            }
-            canvas {
-              background-color: #f0f0f0; /* Fallback color */
-              border-radius: 8px;
-            }
-            @media (max-width: 768px) {
-              .App {
-                width: 95%;
-                padding: 1rem;
-              }
-              h1 { font-size: 1.8rem; }
-              h2 { font-size: 1.4rem; }
-            }
-            @media (max-width: 480px) {
-              .App {
-                width: 100%;
-                padding: 0.5rem;
-                border-radius: 0;
-              }
-            }
-          `}</style>
-
-          {gameState === 'playing' && (
-            <button 
-              id="pause-btn" 
-              onClick={pauseGame}
-              style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10, ...styles.button, fontSize: '0.8rem', padding: '8px 16px' }}
-            >
-              Pause
-            </button>
-          )}
-
-          {gameState === 'menu' && (
-            <div id="menuScreen" className="overlay-screen">
-              <h2>Main Menu</h2>
-              <button onClick={() => setGameState('start')} style={styles.button}>Start Game</button>
-              <button onClick={viewLeaderboard} style={styles.button}>Visit Highest Scoreboard</button>
-              <button onClick={resetScores} style={{ ...styles.button, backgroundColor: '#dc3545', marginTop: '20px' }}>Reset All Scores</button>
+        {(gameState === 'playing' || gameState === 'paused') && (
+          <div ref={gameContainerRef} className="game-container">
+            <div id="score-container" style={{ fontSize: '1.5rem', marginBottom: '10px' }}>
+              Score: <span ref={scoreSpanRef}>0</span>
             </div>
-          )}
-
-          {gameState === 'leaderboard' && (
-            <div id="leaderboardScreen" className="overlay-screen">
-              <h2>Leaderboard</h2>
-              <ul className="leaderboard-list">
-                {leaderboard.length > 0 ? (
-                  leaderboard.map((entry, index) => (
-                    <li key={index}>
-                      <span>{entry.name || 'Anonymous'}</span>
-                      <span>{entry.score}</span>
-                    </li>
-                  ))
-                ) : (
-                  <li>Loading or No Scores...</li>
-                )}
-              </ul>
-              <button onClick={() => setGameState('menu')} style={styles.button}>Back</button>
-            </div>
-          )}
-
-          {gameState === 'mode-selection' && (
-            <div id="modeScreen" className="overlay-screen">
-              <h2>Choose Your Mode</h2>
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px' }}>
-                {THEMES.map((theme) => (
-                  <button key={theme.id} onClick={() => selectTheme(theme)} style={styles.modeButton}>
-                    {theme.name}
-                  </button>
-                ))}
+            <canvas ref={canvasRef} />
+            {gameState === 'playing' && (
+              <button 
+                id="pause-btn" 
+                onClick={pauseGame}
+                style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10, ...styles.button, fontSize: '0.8rem', padding: '8px 16px' }}
+              >
+                Pause
+              </button>
+            )}
+            {gameState === 'paused' && (
+              <div id="pauseScreen" className="overlay-screen">
+                <h2>Paused</h2>
+                <button onClick={resumeGame} style={styles.button}>Resume</button>
+                <button onClick={exitGame} style={{ ...styles.button, backgroundColor: '#f44336' }}>Exit to Menu</button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          {gameState === 'ready' && (
-            <div id="readyScreen" className="overlay-screen">
-              <h2>Are you ready to play?</h2>
-              <p>Mode: <strong>{selectedTheme.name}</strong></p>
-              <button onClick={startGame} style={styles.button}>Play</button>
-              <button onClick={() => setGameState('mode-selection')} style={{ ...styles.button, backgroundColor: '#888' }}>Back</button>
-            </div>
-          )}
-
-          {gameState === 'start' && (
-            <div id="startScreen" className="overlay-screen">
-              <h2>Welcome to SKY</h2>
-              <input 
-                type="text" 
-                placeholder="Enter your name" 
-                maxLength="15"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                style={styles.input}
-              />
-              <button onClick={goToModes} style={styles.button}>Next</button>
-              <button onClick={() => setGameState('menu')} style={{ ...styles.button, backgroundColor: '#888' }}>Back</button>
-            </div>
-          )}
-
-          {gameState === 'paused' && (
-            <div id="pauseScreen" className="overlay-screen">
-              <h2>Paused</h2>
-              <button onClick={resumeGame} style={styles.button}>Resume</button>
-              <button onClick={exitGame} style={{ ...styles.button, backgroundColor: '#f44336' }}>Exit to Menu</button>
-            </div>
-          )}
-
-          {gameState === 'gameover' && (
-            <div id="gameOverScreen" className="overlay-screen">
-              <h2>Game Over</h2>
-              <p>Final Score: <span>{finalScore}</span></p>
-              <h3>Top 5 Leaderboard</h3>
-              <ul className="leaderboard-list">
-                {leaderboard.map((entry, index) => (
+        {gameState === 'leaderboard' && (
+          <div id="leaderboardScreen">
+            <h2>Leaderboard</h2>
+            <ul className="leaderboard-list">
+              {leaderboard.length > 0 ? (
+                leaderboard.map((entry, index) => (
                   <li key={index}>
                     <span>{entry.name || 'Anonymous'}</span>
                     <span>{entry.score}</span>
                   </li>
-                ))}
-              </ul>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                <button className="game-over-btn" onClick={restartGame} style={styles.button}>Play Again</button>
-                <button className="game-over-btn" onClick={exitGame} style={{ ...styles.button, backgroundColor: '#f44336' }}>Exit</button>
-              </div>
+                ))
+              ) : (
+                <li>Loading or No Scores...</li>
+              )}
+            </ul>
+            <button onClick={() => setGameState('home')} style={styles.button}>Back</button>
+            <button onClick={resetScores} style={{ ...styles.button, backgroundColor: '#dc3545', marginTop: '10px' }}>Reset Scores</button>
+          </div>
+        )}
+
+        {gameState === 'gameover' && (
+          <div id="gameOverScreen">
+            <h2>Game Over</h2>
+            <p>Final Score: <span>{finalScore}</span></p>
+            <h3>Top 5 Leaderboard</h3>
+            <ul className="leaderboard-list">
+              {leaderboard.map((entry, index) => (
+                <li key={index}>
+                  <span>{entry.name || 'Anonymous'}</span>
+                  <span>{entry.score}</span>
+                </li>
+              ))}
+            </ul>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button className="game-over-btn" onClick={restartGame} style={styles.button}>Play Again</button>
+              <button className="game-over-btn" onClick={exitGame} style={{ ...styles.button, backgroundColor: '#f44336' }}>Exit</button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </main>
 
       <footer>
