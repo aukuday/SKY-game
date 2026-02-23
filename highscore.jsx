@@ -33,12 +33,21 @@ function HighScore({ scoresUpdated }) {
     <>
       <style>{`
         @keyframes darkPulse {
-          0% { box-shadow: 0 0 15px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.8); transform: scale(1); }
-          50% { box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,1); transform: scale(1.02); }
-          100% { box-shadow: 0 0 15px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.8); transform: scale(1); }
+          0% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+          100% { transform: scale(1); }
+        }
+        @keyframes rgbBorder {
+          0% { border-color: #ff0000; box-shadow: 0 0 15px #ff0000, inset 0 0 10px rgba(0,0,0,0.8); }
+          16% { border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff, inset 0 0 10px rgba(0,0,0,0.8); }
+          33% { border-color: #0000ff; box-shadow: 0 0 15px #0000ff, inset 0 0 10px rgba(0,0,0,0.8); }
+          50% { border-color: #00ffff; box-shadow: 0 0 15px #00ffff, inset 0 0 10px rgba(0,0,0,0.8); }
+          66% { border-color: #00ff00; box-shadow: 0 0 15px #00ff00, inset 0 0 10px rgba(0,0,0,0.8); }
+          83% { border-color: #ffff00; box-shadow: 0 0 15px #ffff00, inset 0 0 10px rgba(0,0,0,0.8); }
+          100% { border-color: #ff0000; box-shadow: 0 0 15px #ff0000, inset 0 0 10px rgba(0,0,0,0.8); }
         }
         .high-score-card {
-          animation: darkPulse 3s infinite ease-in-out;
+          animation: darkPulse 3s infinite ease-in-out, rgbBorder 4s linear infinite;
         }
       `}</style>
       <div style={styles.card} className="high-score-card">
@@ -52,12 +61,12 @@ function HighScore({ scoresUpdated }) {
 const styles = {
   card: {
     padding: '20px',
-    background: 'linear-gradient(145deg, #2b2b2b, #000000)',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     borderRadius: '15px',
-    width: '280px',
+    width: '500px',
     margin: '20px auto',
     textAlign: 'center',
-    border: '2px solid #444',
+    border: '3px solid transparent',
     position: 'relative',
     zIndex: 10
   },
